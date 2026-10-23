@@ -161,9 +161,12 @@ fn spawn_history_recorder(
                 .map(|last| data.last_update != last.data.last_update)
                 .unwrap_or(true)
                 && data.is_charging
+                // A charge-limit hold can last indefinitely below 100%.
+                // Keep the session, but do not accumulate paused samples.
+                && !data.is_charging_paused
                 && !full_charged
             {
-                log::info!("staged: {:#?}", staged.len());
+                log::debug!("staged: {:#?}", staged.len());
                 staged.push(ChargingHistoryStage {
                     raw: serde_json::to_string(&data).unwrap(),
                     data,

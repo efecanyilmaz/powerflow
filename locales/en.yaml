@@ -20,6 +20,8 @@ status:
   to_full: to full
   to_empty: to empty
   fully_charged: Fully Charged
+  charging_paused: Charging paused
+  time_unavailable: Time unavailable
   battery_in: Battery In
   power_loss: Power Loss
   screen_power: Screen

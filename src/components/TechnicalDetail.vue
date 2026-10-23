@@ -32,8 +32,9 @@ const power = usePower()
       </CardHeader>
       <CardContent>
         <div v-if="!power.isLoading" class="text-2xl font-bold">
-          <!-- TODO: typing -->
-          {{ (power.maxCapacity / power.designCapacity! * 100).toFixed(1) }}%
+          {{ power.designCapacity && power.designCapacity > 0 && power.maxCapacity > 0
+            ? `${(power.maxCapacity / power.designCapacity * 100).toFixed(1)}%`
+            : '—' }}
         </div>
         <Skeleton v-else class="w-12 h-8" />
         <p class="text-xs text-muted-foreground">

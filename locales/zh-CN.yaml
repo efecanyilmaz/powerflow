@@ -19,6 +19,8 @@ status:
   to_full: 充满
   to_empty: 耗尽
   fully_charged: 已充满
+  charging_paused: 充电已暂停
+  time_unavailable: 剩余时间不可用
   battery_in: 电池输入
   power_loss: 损耗
   screen_power: 屏幕

@@ -1,8 +1,8 @@
 use std::process;
 
 use tauri::{
-    menu::{MenuBuilder, MenuItemBuilder},
-    tray::{MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    menu::{Menu, MenuBuilder, MenuItemBuilder},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     ActivationPolicy, Manager, Runtime,
 };
 use tauri_plugin_nspopover::{AppExt, WindowExt as _};
@@ -24,7 +24,6 @@ pub fn setup_tray_icon<R: Runtime>(app: &impl Manager<R>) -> tauri::Result<()> {
     let tray_icon = TrayIconBuilder::with_id("main")
         .title("0 w")
         .menu_on_left_click(false)
-        .menu(&menu)
         .build(app)
         .unwrap();
 
@@ -55,15 +54,37 @@ pub fn setup_tray_icon<R: Runtime>(app: &impl Manager<R>) -> tauri::Result<()> {
     tray_icon.on_tray_icon_event(move |tray_handle, event| {
         tauri_plugin_positioner::on_tray_event(tray_handle.app_handle(), &event);
         if let TrayIconEvent::Click {
-            button_state: MouseButtonState::Up,
+            button,
+            button_state,
             ..
         } = event
         {
             let handle = tray_handle.app_handle();
-            if handle.is_popover_shown() {
-                handle.hide_popover();
-            } else {
-                handle.show_popover();
+            match (button, button_state) {
+                (MouseButton::Left, MouseButtonState::Up) => {
+                    if handle.is_popover_shown() {
+                        handle.hide_popover();
+                    } else {
+                        handle.show_popover();
+                    }
+                }
+                (MouseButton::Right, MouseButtonState::Down) => {
+                    handle.hide_popover();
+                    // Let the status item present its own menu in the current
+                    // Space, including over fullscreen apps. Attach it only
+                    // while tracking so left-click still opens the popover.
+                    if let Err(error) = tray_handle.set_menu(Some(menu.clone())) {
+                        log::warn!("failed to attach tray context menu: {error}");
+                        return;
+                    }
+                    unsafe {
+                        handle.ns_statusbar_button().performClick(None);
+                    }
+                    if let Err(error) = tray_handle.set_menu(None::<Menu<R>>) {
+                        log::warn!("failed to detach tray context menu: {error}");
+                    }
+                }
+                _ => {}
             }
         }
     });

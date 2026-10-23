@@ -123,8 +123,11 @@ pub fn start_sender<R: Runtime>(
     let mut timer = time::interval(Duration::from_millis(
         app.pinia()
             .try_get::<u64>("preference", "updateInterval")
-            .unwrap_or(2000),
+            .unwrap_or(2000)
+            .max(500),
     ));
+    // Sampling past readings cannot recover them; avoid catch-up bursts.
+    timer.set_missed_tick_behavior(time::MissedTickBehavior::Skip);
     let mut status_bar_item = app
         .pinia()
         .try_get::<StatusBarItem>("preference", "statusBarItem")
@@ -153,6 +156,7 @@ pub fn start_sender<R: Runtime>(
                         } else {
                             interval
                         });
+                        timer.set_missed_tick_behavior(time::MissedTickBehavior::Skip);
                     },
                     SenderMessage::ChangeStatusBarItem(item) => {
                         status_bar_item = item;

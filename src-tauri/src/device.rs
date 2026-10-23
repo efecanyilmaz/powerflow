@@ -81,6 +81,7 @@ pub fn start_device_listener() -> mpsc::Receiver<DeviceMessage> {
 pub fn start_device_sender(handle: AppHandle) -> async_runtime::JoinHandle<()> {
     let mut rx = start_device_listener();
     let mut timer = time::interval(Duration::from_millis(2000));
+    timer.set_missed_tick_behavior(time::MissedTickBehavior::Skip);
 
     let mut devices: HashMap<Device, ServiceConnection> = HashMap::new();
 

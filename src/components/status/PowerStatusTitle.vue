@@ -7,6 +7,8 @@ const rawData = usePowerRaw()
 
 const showRemainDuration = ref(true)
 const buttonText = computed(() => {
+  if (power.value.timeRemain.secs <= 0 || power.value.timeRemain.secs >= 65535 * 60)
+    return '—'
   if (showRemainDuration.value) {
     const minutes = power.value.timeRemain.secs / 60
     const hours = Math.floor(minutes / 60)

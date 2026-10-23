@@ -33,6 +33,8 @@ pub mod remote;
 pub struct NormalizedResource {
     pub is_local: bool,
     pub is_charging: bool,
+    #[serde(default)]
+    pub is_charging_paused: bool,
     pub time_remain: Duration,
     pub last_update: i64,
     pub adapter_name: Option<String>,
@@ -121,6 +123,11 @@ impl Deref for NormalizedResource {
 
 impl From<&IORegistry> for NormalizedResource {
     fn from(io: &IORegistry) -> Self {
+        let (max_capacity, current_capacity, design_capacity) = battery_capacities(io);
+        let is_charging_paused = io.external_connected
+            && !io.is_charging
+            && !io.fully_charged
+            && io.amperage == 0;
         let (system_in, system_load, battery_power, adapter_power, efficiency_loss) =
             if let Some(d) = io.ptd() {
                 (
@@ -137,7 +144,12 @@ impl From<&IORegistry> for NormalizedResource {
         Self {
             is_local: false,
             is_charging: io.is_charging,
-            time_remain: Duration::from_secs(io.time_remaining as u64 * 60),
+            is_charging_paused,
+            time_remain: if is_charging_paused || !(0..65535).contains(&io.time_remaining) {
+                Duration::ZERO
+            } else {
+                Duration::from_secs(io.time_remaining as u64 * 60)
+            },
             last_update: io.update_time,
             adapter_name: io
                 .adapter_details
@@ -145,9 +157,9 @@ impl From<&IORegistry> for NormalizedResource {
                 .clone()
                 .or_else(|| io.adapter_details.description.clone()),
             cycle_count: io.cycle_count,
-            max_capacity: io.apple_raw_max_capacity,
-            design_capacity: io.design_capacity,
-            current_capacity: io.apple_raw_current_capacity,
+            max_capacity,
+            design_capacity,
+            current_capacity,
             data: NormalizedData {
                 system_in,
                 system_load,
@@ -158,8 +170,8 @@ impl From<&IORegistry> for NormalizedResource {
                 heatpipe_power: 0.,
                 battery_level: io.current_capacity,
                 absolute_battery_level: absolute_battery_level(
-                    io.apple_raw_current_capacity,
-                    io.apple_raw_max_capacity,
+                    current_capacity,
+                    max_capacity,
                 ),
                 temperature: io.temperature as f32 / 100.,
 
@@ -172,6 +184,29 @@ impl From<&IORegistry> for NormalizedResource {
     }
 }
 
+fn battery_capacities(io: &IORegistry) -> (i32, i32, i32) {
+    let mut max_capacity = io.apple_raw_max_capacity;
+    let mut current_capacity = io.apple_raw_current_capacity;
+    let mut design_capacity = io.design_capacity;
+
+    // CurrentCapacity / MaxCapacity are percentages, not mAh. Newer macOS
+    // versions expose the mAh measurements inside BatteryData instead.
+    if let Some(battery) = &io.battery_data {
+        if let Some(value) = battery.full_charge_capacity.filter(|value| *value > 0) {
+            max_capacity = value;
+        }
+        // Zero is a valid remaining capacity; only absent/negative values fall back.
+        if let Some(value) = battery.remaining_capacity.filter(|value| *value >= 0) {
+            current_capacity = value;
+        }
+        if let Some(value) = battery.design_capacity.filter(|value| *value > 0) {
+            design_capacity = value;
+        }
+    }
+
+    (max_capacity, current_capacity, design_capacity)
+}
+
 fn absolute_battery_level(current: i32, max: i32) -> f32 {
     if max == 0 {
         0.0
@@ -182,26 +217,35 @@ fn absolute_battery_level(current: i32, max: i32) -> f32 {
 
 impl From<(&IORegistry, &SMCPowerData)> for NormalizedResource {
     fn from((io, smc): (&IORegistry, &SMCPowerData)) -> Self {
+        let (max_capacity, current_capacity, design_capacity) = battery_capacities(io);
+        let is_charging_paused = io.external_connected
+            && !io.is_charging
+            && !io.fully_charged
+            && io.amperage == 0;
+        let minutes = if smc.is_charging() {
+            smc.time_to_full
+        } else {
+            smc.time_to_empty
+        };
         Self {
             is_local: true,
             last_update: io.update_time,
             is_charging: smc.is_charging(),
-            time_remain: Duration::from_secs_f32(
-                60.0 * if smc.is_charging() {
-                    smc.time_to_full
-                } else {
-                    smc.time_to_empty
-                },
-            ),
+            is_charging_paused,
+            time_remain: if is_charging_paused || !(0.0..65535.0).contains(&minutes) {
+                Duration::ZERO
+            } else {
+                Duration::from_secs_f32(60.0 * minutes)
+            },
             adapter_name: io
                 .adapter_details
                 .name
                 .clone()
                 .or_else(|| io.adapter_details.description.clone()),
             cycle_count: io.cycle_count,
-            max_capacity: io.apple_raw_max_capacity,
-            design_capacity: io.design_capacity,
-            current_capacity: io.apple_raw_current_capacity,
+            max_capacity,
+            design_capacity,
+            current_capacity,
             data: NormalizedData {
                 system_in: smc.delivery_rate,
                 system_load: smc.system_total,
@@ -213,8 +257,8 @@ impl From<(&IORegistry, &SMCPowerData)> for NormalizedResource {
                 heatpipe_power: smc.heatpipe,
                 battery_level: io.current_capacity,
                 absolute_battery_level: absolute_battery_level(
-                    io.apple_raw_current_capacity,
-                    io.apple_raw_max_capacity,
+                    current_capacity,
+                    max_capacity,
                 ),
                 temperature: smc.temperature,
                 adapter_power: smc.delivery_rate
@@ -261,16 +305,13 @@ pub fn get_mac_ioreg_dict() -> anyhow::Result<CFDictionary> {
 
 /// Read local Mac battery / power telemetry from IORegistry.
 ///
-/// NOTE: `repr::IORegistry` and `IORegistry` share an identical field layout
-/// (generated by `with_repr!`); we only transmute the *value*, never a `Result`.
-/// The previous code did `transmute(dict_into(...))` on the whole `Result`, which
-/// reinterpreted `DictParseError` as `anyhow::Error` and caused SIGSEGV when the
-/// panic path tried to format the bogus error (seen on macOS 27 / new plists).
+/// Parse errors are converted normally, and parsed fields are copied into the
+/// output type rather than relying on Rust struct or Result memory layouts.
 pub fn get_mac_ioreg() -> anyhow::Result<IORegistry> {
     let dic = get_mac_ioreg_dict()?;
     let ioreg = dict_into::<repr::IORegistry>(dic)
         .map_err(|e| anyhow::anyhow!("failed to parse AppleSmartBattery IORegistry: {e}"))?;
-    Ok(unsafe { mem::transmute::<repr::IORegistry, IORegistry>(ioreg) })
+    Ok(ioreg.into())
 }
 
 #[derive(Debug)]

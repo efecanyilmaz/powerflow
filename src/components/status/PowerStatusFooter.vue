@@ -11,7 +11,7 @@ const { t } = useI18n()
   <div class="flex flex-col gap-2">
     <div class="flex items-center justify-between">
       <div v-if="!power.isLoading" class="flex items-center gap-2">
-        <BatteryCharging v-if="power.isCharging" class="size-5 text-blue-500" />
+        <BatteryCharging v-if="power.isCharging && !power.isChargingPaused" class="size-5 text-blue-500" />
         <BatteryFull v-else-if="power.batteryLevel > 66" class="size-5" />
         <BatteryMedium v-else-if="power.batteryLevel > 33" class="size-5" />
         <BatteryLow
@@ -31,7 +31,9 @@ const { t } = useI18n()
         class="text-sm font-medium truncate"
         :class="power.isCharging ? 'text-blue-500' : 'text-muted-foreground'"
       >
-        <span v-if="power.isCharging && power.batteryLevel === 100">{{ $t('status.fully_charged') }}</span>
+        <span v-if="power.isChargingPaused">{{ $t('status.charging_paused') }}</span>
+        <span v-else-if="power.isCharging && power.batteryLevel === 100">{{ $t('status.fully_charged') }}</span>
+        <span v-else-if="power.timeRemain.secs <= 0 || power.timeRemain.secs >= 65535 * 60">{{ $t('status.time_unavailable') }}</span>
         <template v-else>
           <span class="font-semibold mr-1">{{ formatChargingDuration(power.timeRemain.secs, t) }}</span>
           <span>{{ power.isCharging ? $t('status.to_full') : $t('status.to_empty') }}</span>
