@@ -15,6 +15,7 @@ use objc2_app_kit::{
 use specta_typescript::{BigIntExportBehavior, Typescript};
 use sqlx::{Pool, Sqlite};
 use tauri::{ActivationPolicy, AppHandle, Manager, RunEvent, State, Window, WindowEvent};
+use tauri_plugin_pinia::ManagerExt;
 use tauri_specta::{collect_commands, collect_events};
 use tpower::ffi::InterfaceType;
 use tray_icon::setup_tray_icon;
@@ -189,6 +190,21 @@ pub fn run() {
 
             setup_traffic_light_positioner(app.main_window().unwrap());
 
+            let main = app.main_window().unwrap();
+            if let Ok([width, height]) = app
+                .handle()
+                .pinia()
+                .try_get::<[f64; 2]>("window", "mainSize")
+            {
+                if width.is_finite() && height.is_finite() && width > 0.0 && height > 0.0 {
+                    let size = tauri::LogicalSize::new(width, height);
+                    if let Err(error) = main.set_size(size) {
+                        log::warn!("failed to restore main window size: {error}");
+                    }
+                }
+            }
+            main.show()?;
+
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -216,6 +232,25 @@ fn handle_window_event(window: &Window, event: &WindowEvent) {
         match event {
             WindowEvent::CloseRequested { api, .. } => {
                 api.prevent_close();
+
+                // Store logical pixels so the size survives changes in display scale.
+                // Fullscreen dimensions belong to the Space, not the normal window.
+                if !window.is_fullscreen().unwrap_or(false) {
+                    if let (Ok(size), Ok(scale)) = (window.inner_size(), window.scale_factor()) {
+                        let size = size.to_logical::<f64>(scale);
+                        let pinia = window.app_handle().pinia();
+                        if let Err(error) = pinia
+                            .set(
+                                "window",
+                                "mainSize",
+                                serde_json::json!([size.width, size.height]),
+                            )
+                            .and_then(|_| pinia.save_now("window"))
+                        {
+                            log::warn!("failed to save main window size: {error}");
+                        }
+                    }
+                }
 
                 window.hide().unwrap();
                 window

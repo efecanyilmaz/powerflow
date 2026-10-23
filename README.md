@@ -10,6 +10,15 @@ Powerflow is a macOS application designed to monitor the **power usage** and **c
 - 📊 **Detailed Insights**: View historical power usage and charging trends.
 - 🚀 **Lightweight and Fast**: Designed with performance in mind for seamless operation.
 
+In **Preferences → Appearance → Power Graph Animation**, choose **Redraw** (the
+existing transition) or **Scroll** (samples slide left). The choice is saved.
+The **Animations** switch controls both graph modes and the power-flow animation.
+It follows macOS Reduce Motion on a fresh installation; your saved choice takes
+precedence for power readings, graphs, and the power-flow animation.
+Live graphs retain the latest 20 samples; charging history is stored separately.
+
+Closing the main window saves its size for the next launch.
+
 ---
 
 ## Installation

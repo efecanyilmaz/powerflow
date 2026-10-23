@@ -6,11 +6,12 @@ import { useDocumentVisibility } from '@vueuse/core'
 import { computed, reactive } from 'vue'
 import { useTab } from './useTab'
 
-const MAX_STATISTICS_LENGTH = 20
+export const MAX_STATISTICS_LENGTH = 20
 const LOCAL_UPDATE_INTERVAL = 3
 
 export interface StatisticData {
   'time': string
+  'timestamp': number
   'System Power': number
   'System In': number
   'Battery Level': number
@@ -23,9 +24,12 @@ interface RawPowerData {
   statistics: StatisticData[]
 }
 
-function trimStatistics(statistics: StatisticData[]) {
+export function appendStatistic(statistics: StatisticData[], sample: StatisticData) {
+  if (statistics[statistics.length - 1]?.timestamp === sample.timestamp)
+    return
+  statistics.push(sample)
   if (statistics.length > MAX_STATISTICS_LENGTH)
-    statistics.shift()
+    statistics.splice(0, statistics.length - MAX_STATISTICS_LENGTH)
 }
 
 const localPowerData: Reactive<RawPowerData> = reactive({
@@ -35,7 +39,7 @@ const localPowerData: Reactive<RawPowerData> = reactive({
 
 let localUpdateCount = 0
 
-events.powerTickEvent.listen(async ({ payload: { data } }) => {
+events.powerTickEvent.listen(({ payload: { data } }) => {
   localPowerData.data = data
 
   localUpdateCount++
@@ -43,10 +47,10 @@ events.powerTickEvent.listen(async ({ payload: { data } }) => {
     return
   localUpdateCount = 0
 
-  trimStatistics(localPowerData.statistics)
-
-  localPowerData.statistics.push({
-    'time': new Date().toLocaleTimeString(),
+  const now = new Date()
+  appendStatistic(localPowerData.statistics, {
+    'time': now.toLocaleTimeString(),
+    'timestamp': now.getTime(),
     'System Power': data.systemLoad,
     'System In': data.systemIn,
     'Battery Level': data.batteryLevel,
@@ -59,19 +63,13 @@ events.devicePowerTickEvent.listen(({ payload: { data, udid } }) => {
   const deviceData = getOrCreateDeviceData(udid)
   deviceData.data = data
 
-  const statistics = deviceData.statistics
-  trimStatistics(statistics)
-
-  const time = new Date(data.lastUpdate * 1000).toLocaleTimeString()
-
-  if (!statistics.length || time !== statistics[statistics.length - 1]?.time) {
-    statistics.push({
-      time,
-      'System Power': data.systemLoad,
-      'System In': data.systemIn,
-      'Battery Level': data.batteryLevel,
-    })
-  }
+  appendStatistic(deviceData.statistics, {
+    'time': new Date(data.lastUpdate * 1000).toLocaleTimeString(),
+    'timestamp': data.lastUpdate * 1000,
+    'System Power': data.systemLoad,
+    'System In': data.systemIn,
+    'Battery Level': data.batteryLevel,
+  })
 })
 
 export type RemotePowerData = RawPowerData & {

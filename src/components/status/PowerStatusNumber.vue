@@ -13,6 +13,7 @@ const { preference, isLoading } = usePreferenceAsync()
       class="text-4xl font-bold"
       :format="{ maximumFractionDigits: 1, minimumFractionDigits: 1 }"
       :value="power.isCharging ? power.systemIn : power.systemLoad"
+      :respect-motion-preference="false"
       suffix="w"
     />
     <div v-else class="text-4xl leading-[54px] font-bold">

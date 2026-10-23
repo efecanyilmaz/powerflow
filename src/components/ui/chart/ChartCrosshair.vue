@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { BulletLegendItemInterface } from '@unovis/ts'
-import { omit } from '@unovis/ts'
 import { VisCrosshair, VisTooltip } from '@unovis/vue'
 import { type Component, createApp } from 'vue'
 import { ChartTooltip } from '.'
@@ -15,21 +14,28 @@ const props = withDefaults(defineProps<{
 })
 
 // Use weakmap to store reference to each datapoint for Tooltip
-const wm = new WeakMap()
+let wm = new WeakMap<object, string>()
+watch(() => [props.items, props.index, props.customTooltip], () => {
+  wm = new WeakMap()
+})
 function template(d: any) {
   if (wm.has(d)) {
     return wm.get(d)
   }
   else {
     const componentDiv = document.createElement('div')
-    const omittedData = Object.entries(omit(d, [props.index])).map(([key, value]) => {
-      const legendReference = props.items.find(i => i.name === key)
-      return { ...legendReference, value }
-    })
+    const omittedData = props.items.map(item => ({ ...item, value: d[item.name] }))
     const TooltipComponent = props.customTooltip ?? ChartTooltip
-    createApp(TooltipComponent, { title: d[props.index].toString(), data: omittedData }).mount(componentDiv)
-    wm.set(d, componentDiv.innerHTML)
-    return componentDiv.innerHTML
+    const app = createApp(TooltipComponent, { title: String(d[props.index]), data: omittedData })
+    try {
+      app.mount(componentDiv)
+      const html = componentDiv.innerHTML
+      wm.set(d, html)
+      return html
+    }
+    finally {
+      app.unmount()
+    }
   }
 }
 

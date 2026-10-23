@@ -124,10 +124,8 @@ impl Deref for NormalizedResource {
 impl From<&IORegistry> for NormalizedResource {
     fn from(io: &IORegistry) -> Self {
         let (max_capacity, current_capacity, design_capacity) = battery_capacities(io);
-        let is_charging_paused = io.external_connected
-            && !io.is_charging
-            && !io.fully_charged
-            && io.amperage == 0;
+        let is_charging_paused =
+            io.external_connected && !io.is_charging && !io.fully_charged && io.amperage == 0;
         let (system_in, system_load, battery_power, adapter_power, efficiency_loss) =
             if let Some(d) = io.ptd() {
                 (
@@ -169,10 +167,7 @@ impl From<&IORegistry> for NormalizedResource {
                 brightness_power: 0.,
                 heatpipe_power: 0.,
                 battery_level: io.current_capacity,
-                absolute_battery_level: absolute_battery_level(
-                    current_capacity,
-                    max_capacity,
-                ),
+                absolute_battery_level: absolute_battery_level(current_capacity, max_capacity),
                 temperature: io.temperature as f32 / 100.,
 
                 adapter_watts: io.adapter_details.watts.unwrap_or_default() as f32,
@@ -218,10 +213,8 @@ fn absolute_battery_level(current: i32, max: i32) -> f32 {
 impl From<(&IORegistry, &SMCPowerData)> for NormalizedResource {
     fn from((io, smc): (&IORegistry, &SMCPowerData)) -> Self {
         let (max_capacity, current_capacity, design_capacity) = battery_capacities(io);
-        let is_charging_paused = io.external_connected
-            && !io.is_charging
-            && !io.fully_charged
-            && io.amperage == 0;
+        let is_charging_paused =
+            io.external_connected && !io.is_charging && !io.fully_charged && io.amperage == 0;
         let minutes = if smc.is_charging() {
             smc.time_to_full
         } else {
@@ -256,10 +249,7 @@ impl From<(&IORegistry, &SMCPowerData)> for NormalizedResource {
                 brightness_power: smc.brightness,
                 heatpipe_power: smc.heatpipe,
                 battery_level: io.current_capacity,
-                absolute_battery_level: absolute_battery_level(
-                    current_capacity,
-                    max_capacity,
-                ),
+                absolute_battery_level: absolute_battery_level(current_capacity, max_capacity),
                 temperature: smc.temperature,
                 adapter_power: smc.delivery_rate
                     + io.ptd()

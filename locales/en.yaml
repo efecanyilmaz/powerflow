@@ -50,7 +50,11 @@ settings:
   language_desc: Set the language of the app
   auto: Auto
   animations: Animations
-  animations_desc: Show smooth transitions for changing power
+  animations_desc: Animate power readings and graphs, including when macOS Reduce Motion is on
+  chart_animation: Power Graph Animation
+  chart_animation_desc: Choose how live power samples enter the graph
+  chart_animation_redraw: Redraw
+  chart_animation_scroll: Scroll
   update_and_monitoring: Update & Monitoring
   update_frequency: Update Frequency
   update_frequency_desc: How often to refresh power data

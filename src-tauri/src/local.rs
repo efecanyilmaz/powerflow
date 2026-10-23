@@ -61,9 +61,7 @@ fn emit_local_power_tick<R: Runtime>(
     status_bar_item: &StatusBarItem,
     show_charging: bool,
 ) {
-    if let Err(e) =
-        PowerUpdatedEvent::new_with(smc, status_bar_item, show_charging).emit(app)
-    {
+    if let Err(e) = PowerUpdatedEvent::new_with(smc, status_bar_item, show_charging).emit(app) {
         log::warn!("failed to emit PowerUpdatedEvent: {e}");
     }
 
@@ -76,13 +74,18 @@ fn emit_local_power_tick<R: Runtime>(
             NormalizedResource {
                 is_local: true,
                 is_charging: smc.is_charging(),
-                time_remain: Duration::from_secs_f32(
-                    60.0 * if smc.is_charging() {
+                time_remain: {
+                    let minutes = if smc.is_charging() {
                         smc.time_to_full
                     } else {
                         smc.time_to_empty
-                    },
-                ),
+                    };
+                    if (0.0..65535.0).contains(&minutes) {
+                        Duration::from_secs_f32(60.0 * minutes)
+                    } else {
+                        Duration::ZERO
+                    }
+                },
                 data: NormalizedData {
                     system_in: smc.delivery_rate,
                     system_load: smc.system_total,
@@ -112,18 +115,18 @@ pub fn start_sender<R: Runtime>(
     let mut smc_conn = match SMCConnection::new("AppleSMC") {
         Ok(conn) => conn,
         Err(e) => {
-            log::error!("failed to open AppleSMC connection (kern={e}); local power sender disabled");
+            log::error!(
+                "failed to open AppleSMC connection (kern={e}); local power sender disabled"
+            );
             // Keep the channel drained so senders never hang, but do not panic.
-            return async_runtime::spawn(async move {
-                while rx.recv().await.is_some() {}
-            });
+            return async_runtime::spawn(async move { while rx.recv().await.is_some() {} });
         }
     };
 
     let mut timer = time::interval(Duration::from_millis(
         app.pinia()
             .try_get::<u64>("preference", "updateInterval")
-            .unwrap_or(2000)
+            .unwrap_or(1500)
             .max(500),
     ));
     // Sampling past readings cannot recover them; avoid catch-up bursts.
@@ -134,7 +137,7 @@ pub fn start_sender<R: Runtime>(
         .unwrap_or(StatusBarItem::System);
     let mut show_charging = app
         .pinia()
-        .try_get::<bool>("preference", "showCharging")
+        .try_get::<bool>("preference", "statusBarShowCharging")
         .unwrap_or(true);
 
     async_runtime::spawn(async move {

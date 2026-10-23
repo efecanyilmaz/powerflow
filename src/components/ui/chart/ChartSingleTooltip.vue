@@ -16,47 +16,48 @@ const props = withDefaults(defineProps<{
 })
 
 // Use weakmap to store reference to each datapoint for Tooltip
-const wm = new WeakMap()
+let wm = new WeakMap<object, string>()
+watch(() => [props.items, props.index, props.valueFormatter, props.customTooltip], () => {
+  wm = new WeakMap()
+})
 function template(d: any, i: number, elements: (HTMLElement | SVGElement)[]) {
-  if (props.index in d) {
-    if (wm.has(d)) {
-      return wm.get(d)
-    }
-    else {
-      const componentDiv = document.createElement('div')
-      const omittedData = Object.entries(omit(d, [props.index])).map(([key, value]) => {
-        const legendReference = props.items?.find(i => i.name === key)
-        return { ...legendReference, value: props.valueFormatter(value) }
-      })
-      const TooltipComponent = props.customTooltip ?? ChartTooltip
-      createApp(TooltipComponent, { title: d[props.index], data: omittedData }).mount(componentDiv)
-      wm.set(d, componentDiv.innerHTML)
-      return componentDiv.innerHTML
-    }
-  }
+  const key = props.index in d ? d : d.data
+  if (wm.has(key))
+    return wm.get(key)
 
+  let tooltipData
+  if (props.index in d) {
+    tooltipData = Object.entries(omit(d, [props.index])).map(([key, value]) => {
+      const legendReference = props.items?.find(i => i.name === key)
+      return { ...legendReference, value: props.valueFormatter(value) }
+    })
+  }
   else {
     const data = d.data
+    const style = getComputedStyle(elements[i])
+    tooltipData = [{ name: data.name, value: props.valueFormatter(data[props.index]), color: style.fill }]
+  }
 
-    if (wm.has(data)) {
-      return wm.get(data)
-    }
-    else {
-      const style = getComputedStyle(elements[i])
-      const omittedData = [{ name: data.name, value: props.valueFormatter(data[props.index]), color: style.fill }]
-      const componentDiv = document.createElement('div')
-      const TooltipComponent = props.customTooltip ?? ChartTooltip
-      createApp(TooltipComponent, { title: d[props.index], data: omittedData }).mount(componentDiv)
-      wm.set(d, componentDiv.innerHTML)
-      return componentDiv.innerHTML
-    }
+  const componentDiv = document.createElement('div')
+  const TooltipComponent = props.customTooltip ?? ChartTooltip
+  const app = createApp(TooltipComponent, { title: d[props.index], data: tooltipData })
+  try {
+    app.mount(componentDiv)
+    const html = componentDiv.innerHTML
+    wm.set(key, html)
+    return html
+  }
+  finally {
+    app.unmount()
   }
 }
 </script>
 
 <template>
   <VisTooltip
-    :horizontal-shift="20" :vertical-shift="20" :triggers="{
+    :horizontal-shift="20"
+    :vertical-shift="20"
+    :triggers="{
       [selector]: template,
     }"
   />

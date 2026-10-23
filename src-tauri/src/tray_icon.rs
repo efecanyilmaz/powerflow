@@ -1,5 +1,7 @@
 use std::process;
 
+use objc2_app_kit::NSWindowCollectionBehavior;
+use objc2_foundation::{NSOperatingSystemVersion, NSProcessInfo};
 use tauri::{
     menu::{Menu, MenuBuilder, MenuItemBuilder},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -11,6 +13,13 @@ use tauri_specta::Event;
 use crate::{event::PowerUpdatedEvent, ext::WebviewWindowExt};
 
 pub fn setup_tray_icon<R: Runtime>(app: &impl Manager<R>) -> tauri::Result<()> {
+    let supports_joining_applications = unsafe {
+        NSProcessInfo::processInfo().isOperatingSystemAtLeastVersion(NSOperatingSystemVersion {
+            majorVersion: 13,
+            minorVersion: 0,
+            patchVersion: 0,
+        })
+    };
     let show = MenuItemBuilder::new("Show Window").build(app)?;
     let quit = MenuItemBuilder::new("Quit").build(app)?;
 
@@ -66,6 +75,35 @@ pub fn setup_tray_icon<R: Runtime>(app: &impl Manager<R>) -> tauri::Result<()> {
                         handle.hide_popover();
                     } else {
                         handle.show_popover();
+                        // The plugin moves the webview into a separate native
+                        // window. Configure that window, rather than its hidden
+                        // Tauri host, to overlay other apps' fullscreen Spaces.
+                        let window = unsafe { handle.ns_popover().contentViewController() }
+                            .and_then(|controller| unsafe { controller.view().window() });
+                        if let Some(window) = window {
+                            unsafe {
+                                let mut behavior = window.collectionBehavior();
+                                behavior.remove(
+                                    NSWindowCollectionBehavior::FullScreenPrimary
+                                        | NSWindowCollectionBehavior::FullScreenNone
+                                        | NSWindowCollectionBehavior::MoveToActiveSpace,
+                                );
+                                behavior.insert(
+                                    NSWindowCollectionBehavior::CanJoinAllSpaces
+                                        | NSWindowCollectionBehavior::FullScreenAuxiliary,
+                                );
+                                if supports_joining_applications {
+                                    behavior.remove(
+                                        NSWindowCollectionBehavior::Primary
+                                            | NSWindowCollectionBehavior::Auxiliary,
+                                    );
+                                    behavior
+                                        .insert(NSWindowCollectionBehavior::CanJoinAllApplications);
+                                }
+                                window.setCollectionBehavior(behavior);
+                                window.orderFrontRegardless();
+                            }
+                        }
                     }
                 }
                 (MouseButton::Right, MouseButtonState::Down) => {

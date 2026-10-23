@@ -33,18 +33,26 @@ useSetup()
 
 const loading = ref(true)
 const preference = usePreference()
+const stops: (() => void)[] = []
+let disposed = false
+onScopeDispose(() => {
+  disposed = true
+  stops.forEach(stop => stop())
+})
 
-preference.$tauri.start().then(async () => {
+preference.$tauri.start().then(() => {
+  if (disposed)
+    return
   const refs = storeToRefs(preference)
 
   for (const key in refs) {
     // TODO: fix types
     const ref = refs[key as keyof typeof refs]
-    watch(ref, () => {
+    stops.push(watch(ref, () => {
       events.preferenceEvent.emit({
         [key as keyof typeof refs]: ref.value,
       } as any)
-    })
+    }))
   }
 
   loading.value = false
@@ -164,6 +172,28 @@ function SettingsSection(props: SettingsSectionProps) {
           v-model:checked="preference.animationsEnabled"
           class="data-[state=checked]:bg-blue-500"
         />
+      </SettingsItem>
+      <SettingsItem
+        :name="$t('settings.chart_animation')"
+        :description="$t('settings.chart_animation_desc')"
+        :icon="Activity"
+      >
+        <Skeleton v-if="loading" class="w-32 h-8" />
+        <Select v-else v-model="preference.chartAnimation">
+          <SelectTrigger class="w-[150px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="redraw">
+                {{ $t('settings.chart_animation_redraw') }}
+              </SelectItem>
+              <SelectItem value="scroll">
+                {{ $t('settings.chart_animation_scroll') }}
+              </SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </SettingsItem>
     </div>
 

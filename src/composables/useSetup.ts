@@ -9,7 +9,7 @@ export function useSetup() {
 
   i18n.locale.value = preferedLang.value[0]
 
-  const toggleDark = async () => {
+  const toggleDark = () => {
     document.documentElement.classList.toggle('dark', preference.theme === 'system'
       ? preferDark.value
       : preference.theme === 'dark')
@@ -22,7 +22,7 @@ export function useSetup() {
 
   watch([preferDark, () => preference.theme], toggleDark)
 
-  events.preferenceEvent.listen(({ payload }) => {
+  const unlisten = events.preferenceEvent.listen(({ payload }) => {
     if ('theme' in payload) {
       toggleDark()
     }
@@ -30,6 +30,7 @@ export function useSetup() {
       i18n.locale.value = payload.language
     }
   })
+  onScopeDispose(() => unlisten.then(stop => stop()))
 
   // notify rust to get a instant update
   onMounted(() => {

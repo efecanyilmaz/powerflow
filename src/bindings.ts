@@ -124,7 +124,8 @@ brightnessPower: number;
 heatpipePower: number; batteryLevel: number; absoluteBatteryLevel: number; temperature: number; adapterWatts: number; adapterVoltage: number; adapterAmperage: number }) & { isLocal: boolean; isCharging: boolean; isChargingPaused?: boolean; timeRemain: Duration; lastUpdate: number; adapterName: string | null; cycleCount: number; currentCapacity: number; maxCapacity: number; designCapacity?: number }
 export type PowerTickEvent = { data: NormalizedResource }
 export type PowerUpdatedEvent = string
-export type PreferenceEvent = { theme: Theme } | { animationsEnabled: boolean } | { updateInterval: number } | { language: string } | { statusBarItem: StatusBarItem } | { statusBarShowCharging: boolean }
+export type ChartAnimation = "redraw" | "scroll"
+export type PreferenceEvent = { theme: Theme } | { animationsEnabled: boolean } | { chartAnimation: ChartAnimation } | { updateInterval: number } | { language: string } | { statusBarItem: StatusBarItem } | { statusBarShowCharging: boolean }
 export type StatusBarItem = "system" | "screen" | "heatpipe"
 export type Theme = "light" | "dark" | "system"
 export type WindowLoadedEvent = null

@@ -24,10 +24,18 @@ pub enum StatusBarItem {
 pub enum PreferenceEvent {
     Theme(Theme),
     AnimationsEnabled(bool),
+    ChartAnimation(ChartAnimation),
     UpdateInterval(u32),
     Language(String),
     StatusBarItem(StatusBarItem),
     StatusBarShowCharging(bool),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum ChartAnimation {
+    Redraw,
+    Scroll,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Event, Type)]

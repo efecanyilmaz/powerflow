@@ -1,10 +1,12 @@
-import type { StatusBarItem, Theme } from '@/bindings'
+import type { ChartAnimation, StatusBarItem, Theme } from '@/bindings'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export const usePreference = defineStore('preference', () => {
   const theme = ref<Theme>('system')
-  const animationsEnabled = ref(true)
+  // Use the system default until a saved application preference is loaded.
+  const animationsEnabled = ref(!window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+  const chartAnimation = ref<ChartAnimation>('redraw')
   const updateInterval = ref(1500)
   const language = ref('en')
   const statusBarItem = ref<StatusBarItem>('system')
@@ -13,6 +15,7 @@ export const usePreference = defineStore('preference', () => {
   return {
     theme,
     animationsEnabled,
+    chartAnimation,
     updateInterval,
     language,
     statusBarItem,

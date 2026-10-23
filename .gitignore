@@ -12,6 +12,17 @@ dist
 dist-ssr
 *.local
 
+# Local builds and generated test artifacts
+/build/
+/test-artifacts/
+/test-output/
+/test-results/
+/playwright-report/
+/coverage/
+
+# Local pnpm 11 build-script approvals
+/pnpm-workspace.yaml
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

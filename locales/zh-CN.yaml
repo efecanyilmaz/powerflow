@@ -47,7 +47,11 @@ settings:
   language_desc: 设置应用程序的语言
   auto: 自动
   animations: 动画
-  animations_desc: 显示功率变化的平滑过渡效果
+  animations_desc: 为功率读数和图表启用动画，优先于 macOS 的“减弱动态效果”设置
+  chart_animation: 功率图表动画
+  chart_animation_desc: 选择实时功率数据进入图表的方式
+  chart_animation_redraw: 重绘
+  chart_animation_scroll: 滚动
   update_and_monitoring: 更新与监控
   update_frequency: 更新频率
   update_frequency_desc: 电力数据刷新频率

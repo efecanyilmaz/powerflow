@@ -1,16 +1,23 @@
 <script setup lang="ts">
+import { MAX_STATISTICS_LENGTH } from '@/composables/usePower'
 import { useI18n } from 'vue-i18n'
 import CustomChartTooltip from './CustomChartTooltip.vue'
 
 const { t } = useI18n()
 const power = usePower()
+const preference = usePreference()
+const isRemote = computed(() => power.value.isRemote)
+const isCharging = computed(() => power.value.isCharging)
+const statistics = computed(() => power.value.statistics)
+const colors = ['#2563eb', '#60a5fa', '#818cf8', '#0891b2']
+const formatPower = (value: number | Date) => `${value}w`
 
 const categories = computed(() => {
   const base = ['System Power'] as (keyof StatisticData)[]
-  if (!power.value.isRemote) {
+  if (!isRemote.value) {
     base.push('Screen Power', 'Heatpipe Power')
   }
-  if (power.value.isCharging) {
+  if (isCharging.value) {
     base.push('System In')
   }
   return base
@@ -24,20 +31,12 @@ const localeMap = computed(() => ({
 }))
 
 const localedData = computed(() => {
-  return power.value.statistics.map((item) => {
+  return statistics.value.map((item) => {
     return Object.fromEntries(Object.entries(item).map(([key, value]) => [localeMap.value[key] || key, value]))
   })
 })
 
 const localedCategories = computed(() => categories.value.map(item => localeMap.value[item] || item))
-
-// needs to force update chart when categories change, a bug of chart
-const loading = ref(false)
-watch([localeMap, () => power.value.isCharging], async () => {
-  loading.value = true
-  await nextTick()
-  loading.value = false
-})
 </script>
 
 <template>
@@ -48,16 +47,20 @@ watch([localeMap, () => power.value.isCharging], async () => {
       </CardTitle>
     </CardHeader>
     <CardContent>
-      <Skeleton v-if="power.isLoading || loading" class="w-full h-[240px]" />
+      <Skeleton v-if="power.isLoading" class="w-full h-[240px]" />
       <LineChart
         v-else
         class="w-full h-[240px] font-bold"
         index="time"
-        :y-formatter="(value) => `${value}w`"
+        data-key="timestamp"
+        :window-size="MAX_STATISTICS_LENGTH"
+        :animation="preference.chartAnimation"
+        :animations-enabled="preference.animationsEnabled"
+        :y-formatter="formatPower"
         :data="localedData"
         :categories="localedCategories"
         :custom-tooltip="CustomChartTooltip"
-        :colors="['#2563eb', '#60a5fa', '#818cf8', '#0891b2']"
+        :colors="colors"
       />
     </CardContent>
   </Card>

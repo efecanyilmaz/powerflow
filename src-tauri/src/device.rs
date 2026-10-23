@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     ffi::c_void,
-    mem::{self, MaybeUninit},
+    mem::MaybeUninit,
     sync::{Arc, RwLock},
     time::Duration,
 };
@@ -55,8 +55,7 @@ pub fn start_device_listener() -> mpsc::Receiver<DeviceMessage> {
                 action: info.action,
             })
             .await
-            .unwrap();
-            mem::forget(tx);
+            .unwrap_or_else(|error| log::warn!("device listener stopped: {error}"));
         });
     }
 

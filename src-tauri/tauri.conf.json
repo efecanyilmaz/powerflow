@@ -16,6 +16,7 @@
         "title": "",
         "width": 1000,
         "height": 600,
+        "visible": false,
         "titleBarStyle": "Overlay"
       },
       {
